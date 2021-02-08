@@ -8,19 +8,28 @@ const kBadNativeIoNames = [
 
 // Returns a handle to a newly created file that holds some data.
 //
-// The file will be closed and deleted when the test ends.
-async function createFile(testCase, fileName) {
+// The file will be closed and deleted when the test ends. The capacity for the
+// data written by this function will then be released.
+async function createFile(testCase, fileName, data = [64, 65, 66, 67],
+  deleteAfter = true) {
   const file = await nativeIO.open(fileName);
   testCase.add_cleanup(async () => {
     await file.close();
-    await nativeIO.delete(fileName);
+    if (deleteAfter) {
+      await nativeIO.delete(fileName);
+      await nativeIO.releaseCapacity(data.length);
+    }
   });
 
-  const writeSharedArrayBuffer = new SharedArrayBuffer(4);
+  var available_capacity = await nativeIO.requestCapacity(data.length);
+  assert_greater_than_equal(available_capacity, data.length);
+
+  const writeSharedArrayBuffer = new SharedArrayBuffer(data.length);
   const writtenBytes = new Uint8Array(writeSharedArrayBuffer);
-  writtenBytes.set([64, 65, 66, 67]);
+  writtenBytes.set(data);
   const writeCount = await file.write(writtenBytes, 0);
-  assert_equals(writeCount, 4);
+  assert_equals(writeCount, data.length,
+    'NativeIOFile.write() should resolve with the number of bytes written');
 
   return file;
 }
@@ -28,16 +37,16 @@ async function createFile(testCase, fileName) {
 // Returns a handle to a newly created file that holds some data.
 //
 // The file will be closed and deleted when the test ends.
-function createFileSync(testCase, fileName) {
+function createFileSync(testCase, fileName, data = [64, 65, 66, 67]) {
   const file = nativeIO.openSync(fileName);
   testCase.add_cleanup(() => {
     file.close();
     nativeIO.deleteSync(fileName);
   });
 
-  const writtenBytes = Uint8Array.from([64, 65, 66, 67]);
+  const writtenBytes = Uint8Array.from(data);
   const writeCount = file.write(writtenBytes, 0);
-  assert_equals(writeCount, 4);
+  assert_equals(writeCount, data.length);
 
   return file;
 }

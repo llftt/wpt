@@ -14,6 +14,9 @@ for (let op of kOperations) {
 
     const res = op.prepare();
 
+    var available_capacity = await nativeIO.requestCapacity(1);
+    assert_greater_than_equal(available_capacity, 1);
+
     const setLengthPromise = file.setLength(5);
     await op.assertRejection(testCase, file, res);
 
